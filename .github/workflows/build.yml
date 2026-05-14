@@ -1,9 +1,15 @@
-name: Build APK & IPA
+name: Build APK & Deploy Web
 
 on:
   push:
     branches: [main]
-  workflow_dispatch:   # allows manual trigger from GitHub UI
+  workflow_dispatch:
+
+# Required for GitHub Pages deployment
+permissions:
+  contents: read
+  pages: write
+  id-token: write
 
 jobs:
   build-android:
@@ -36,9 +42,12 @@ jobs:
           path: build/app/outputs/flutter-apk/app-release.apk
           retention-days: 30
 
-  build-ios:
-    name: Build iOS IPA (unsigned)
-    runs-on: macos-latest
+  build-web:
+    name: Build Web PWA & Deploy to GitHub Pages
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
 
@@ -51,22 +60,17 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
-      - name: Install CocoaPods
-        run: sudo gem install cocoapods
+      - name: Build web (PWA)
+        run: flutter build web --release --base-href /mill-costing-app/
 
-      - name: Build IPA (no codesign)
-        run: flutter build ipa --no-codesign
+      - name: Setup GitHub Pages
+        uses: actions/configure-pages@v4
 
-      - name: Package IPA
-        run: |
-          mkdir -p Payload
-          cp -r build/ios/archive/Runner.xcarchive/Products/Applications/Runner.app Payload/
-          zip -r mill-costing.ipa Payload
-          rm -rf Payload
-
-      - name: Upload IPA
-        uses: actions/upload-artifact@v4
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
         with:
-          name: mill-costing-ios
-          path: mill-costing.ipa
-          retention-days: 30
+          path: build/web
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../providers/mill_profile_provider.dart';
 import '../theme/app_theme.dart';
+import '../widgets/install_banner.dart';
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
@@ -57,6 +58,9 @@ class HomeScreen extends ConsumerWidget {
               ),
 
               const SizedBox(height: 24),
+
+              // Install banner (web only)
+              const InstallBanner(),
 
               // Active mill card
               _ActiveMillCard(mill: activeMill, allMills: allMills, ref: ref),

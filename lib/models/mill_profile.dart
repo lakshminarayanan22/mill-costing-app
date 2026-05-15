@@ -384,7 +384,8 @@ class MillProfile {
         workingCapitalLakhs: 625,
         annualDepreciationLakhs: 200,
         annualOverheadsLakhs: 200,
-        interestRatePct: 12.0,
+        // Derived from reference: ₹62,154/day interest on ₹62.5M WC × 362 days = 36%
+        interestRatePct: 36.0,
         staffCount: 17,
         monthlyStaffSalary: 30000,
         dailyWageRate: 300,

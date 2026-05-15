@@ -40,7 +40,8 @@ class _CalculatorScreenState extends ConsumerState<CalculatorScreen> {
   // Waste fields
   late TextEditingController _brWaste;
   late TextEditingController _cardWaste;
-  late TextEditingController _yarnWaste;
+  late TextEditingController _yarnWasteCost; // F27: cost % (0.5%)
+  late TextEditingController _yarnRealisation; // F16: material cost base (70%)
 
   // Blend fields
   late TextEditingController _b2Price;
@@ -99,8 +100,10 @@ class _CalculatorScreenState extends ConsumerState<CalculatorScreen> {
         TextEditingController(text: inp.blowRoomWastePct.toStringAsFixed(2));
     _cardWaste =
         TextEditingController(text: inp.cardingWastePct.toStringAsFixed(2));
-    _yarnWaste =
-        TextEditingController(text: inp.yarnWastePct.toStringAsFixed(2));
+    _yarnWasteCost =
+        TextEditingController(text: inp.yarnWasteCostPct.toStringAsFixed(2));
+    _yarnRealisation =
+        TextEditingController(text: inp.yarnRealisationPct.toStringAsFixed(1));
 
     _b2Price =
         TextEditingController(text: inp.blend2PricePerKg.toStringAsFixed(2));
@@ -119,8 +122,8 @@ class _CalculatorScreenState extends ConsumerState<CalculatorScreen> {
       _count, _cotton, _elec, _spindleSpeed, _tm, _utilisation,
       _packing, _addPacking, _price, _margin,
       _rfEff, _simplexHank, _simplexSpeed, _simplexTm, _simplexEff,
-      _comberNoil, _windingEff, _brWaste, _cardWaste, _yarnWaste,
-      _b2Price, _b2Waste, _b2Pct,
+      _comberNoil, _windingEff, _brWaste, _cardWaste,
+      _yarnWasteCost, _yarnRealisation, _b2Price, _b2Waste, _b2Pct,
     ]) {
       c.dispose();
     }
@@ -159,10 +162,11 @@ class _CalculatorScreenState extends ConsumerState<CalculatorScreen> {
       blend2PricePerKg: double.tryParse(_b2Price.text) ?? 0,
       blend2WastePct: double.tryParse(_b2Waste.text) ?? 0,
       blend2Pct: double.tryParse(_b2Pct.text) ?? 0,
+      yarnRealisationPct: double.tryParse(_yarnRealisation.text) ?? 70.0,
       blowRoomWastePct: double.tryParse(_brWaste.text) ?? 5.0,
       cardingWastePct: double.tryParse(_cardWaste.text) ?? 6.65,
       comberNoilPct: double.tryParse(_comberNoil.text) ?? 15.9,
-      yarnWastePct: double.tryParse(_yarnWaste.text) ?? 1.09,
+      yarnWasteCostPct: double.tryParse(_yarnWasteCost.text) ?? 0.5,
       electricityRatePerKwh: double.tryParse(_elec.text) ?? 8.0,
       packingRatePerKg: double.tryParse(_packing.text) ?? 8.0,
       additionalPackingForPlied: double.tryParse(_addPacking.text) ?? 1.0,
@@ -466,15 +470,21 @@ class _CalculatorScreenState extends ConsumerState<CalculatorScreen> {
 
             const SizedBox(height: 12),
 
-            // ── Waste rates ────────────────────────────────────────────────
+            // ── Material & Waste ───────────────────────────────────────────
             Card(
               child: Padding(
                 padding: const EdgeInsets.all(16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const SectionHeader(title: 'WASTE RATES'),
+                    const SectionHeader(title: 'MATERIAL & WASTE RATES'),
                     const SizedBox(height: 12),
+                    LabelField(
+                      label: 'Yarn Realisation',
+                      unit: '%',
+                      controller: _yarnRealisation,
+                    ),
+                    const SizedBox(height: 8),
                     Row(
                       children: [
                         Expanded(
@@ -499,13 +509,19 @@ class _CalculatorScreenState extends ConsumerState<CalculatorScreen> {
                       children: [
                         Expanded(
                           child: LabelField(
-                            label: 'Yarn Waste',
+                            label: 'Comber Noil',
                             unit: '%',
-                            controller: _yarnWaste,
+                            controller: _comberNoil,
                           ),
                         ),
                         const SizedBox(width: 12),
-                        const Expanded(child: SizedBox()),
+                        Expanded(
+                          child: LabelField(
+                            label: 'Yarn Waste Cost',
+                            unit: '%',
+                            controller: _yarnWasteCost,
+                          ),
+                        ),
                       ],
                     ),
                   ],

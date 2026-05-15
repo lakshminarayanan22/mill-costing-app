@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/mill_profile.dart';
+import '../models/blend_preset.dart';
 
 // Persists mill profiles to SharedPreferences as JSON.
 // Simple enough for the data volumes involved (<10 profiles typically).
@@ -49,5 +50,37 @@ class StorageService {
   Future<void> deleteProfile(String id, List<MillProfile> all) async {
     final updated = all.where((p) => p.id != id).toList();
     await saveProfiles(updated);
+  }
+
+  // ── Blend presets ───────────────────────────────────────────────────────────
+  static const _blendsKey = 'blend_presets';
+
+  List<BlendPreset> loadBlendPresets() {
+    final raw = _prefs.getString(_blendsKey);
+    if (raw == null) return [];
+    try {
+      final list = jsonDecode(raw) as List;
+      return list.map((e) => BlendPreset.fromJson(e as Map<String, dynamic>)).toList();
+    } catch (_) {
+      return [];
+    }
+  }
+
+  Future<void> saveBlendPresets(List<BlendPreset> presets) async {
+    await _prefs.setString(
+        _blendsKey, jsonEncode(presets.map((p) => p.toJson()).toList()));
+  }
+
+  Future<void> saveBlendPreset(BlendPreset preset, List<BlendPreset> all) async {
+    final updated = [
+      for (final p in all)
+        if (p.id == preset.id) preset else p,
+      if (!all.any((p) => p.id == preset.id)) preset,
+    ];
+    await saveBlendPresets(updated);
+  }
+
+  Future<void> deleteBlendPreset(String id, List<BlendPreset> all) async {
+    await saveBlendPresets(all.where((p) => p.id != id).toList());
   }
 }

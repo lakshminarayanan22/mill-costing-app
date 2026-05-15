@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../models/blend_preset.dart';
 import '../models/calculation_input.dart';
+import '../providers/blend_preset_provider.dart';
 import '../providers/calculation_provider.dart';
 import '../providers/mill_profile_provider.dart';
 import '../theme/app_theme.dart';
@@ -301,9 +303,16 @@ class _CalculatorScreenState extends ConsumerState<CalculatorScreen> {
                       ],
                     ),
                     if (_isBlend) ...[
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 12),
+                      _BlendPresetBar(
+                        b2PriceCtrl: _b2Price,
+                        b2WasteCtrl: _b2Waste,
+                        b2PctCtrl: _b2Pct,
+                        onLoaded: () => setState(() {}),
+                      ),
+                      const SizedBox(height: 10),
                       LabelField(
-                        label: 'Blend 2 Price',
+                        label: 'Fibre 2 Price',
                         unit: '₹/kg',
                         controller: _b2Price,
                       ),
@@ -312,7 +321,7 @@ class _CalculatorScreenState extends ConsumerState<CalculatorScreen> {
                         children: [
                           Expanded(
                             child: LabelField(
-                              label: 'Blend 2 %',
+                              label: 'Fibre 2 %',
                               unit: '%',
                               controller: _b2Pct,
                             ),
@@ -320,7 +329,7 @@ class _CalculatorScreenState extends ConsumerState<CalculatorScreen> {
                           const SizedBox(width: 12),
                           Expanded(
                             child: LabelField(
-                              label: 'Blend 2 Waste %',
+                              label: 'Fibre 2 Waste %',
                               unit: '%',
                               controller: _b2Waste,
                             ),
@@ -638,6 +647,252 @@ class _CalculatorScreenState extends ConsumerState<CalculatorScreen> {
           ],
         ),
       ),
+    );
+  }
+}
+
+// ── Blend preset bar ──────────────────────────────────────────────────────────
+// Shows saved blend chips + Save / Delete actions.
+// Loading a preset fills the controllers but leaves them fully editable.
+class _BlendPresetBar extends ConsumerStatefulWidget {
+  final TextEditingController b2PriceCtrl;
+  final TextEditingController b2WasteCtrl;
+  final TextEditingController b2PctCtrl;
+  final VoidCallback onLoaded;
+
+  const _BlendPresetBar({
+    required this.b2PriceCtrl,
+    required this.b2WasteCtrl,
+    required this.b2PctCtrl,
+    required this.onLoaded,
+  });
+
+  @override
+  ConsumerState<_BlendPresetBar> createState() => _BlendPresetBarState();
+}
+
+class _BlendPresetBarState extends ConsumerState<_BlendPresetBar> {
+  String? _selectedId;
+
+  void _load(BlendPreset p) {
+    widget.b2PriceCtrl.text = p.blend2PricePerKg.toStringAsFixed(2);
+    widget.b2WasteCtrl.text = p.blend2WastePct.toStringAsFixed(1);
+    widget.b2PctCtrl.text   = p.blend2Pct.toStringAsFixed(1);
+    setState(() => _selectedId = p.id);
+    widget.onLoaded();
+  }
+
+  void _showSaveDialog(List<BlendPreset> existing) {
+    final nameCtrl = TextEditingController();
+    final labelCtrl = TextEditingController();
+
+    // Pre-fill name if editing selected preset
+    if (_selectedId != null) {
+      final sel = existing.where((p) => p.id == _selectedId).firstOrNull;
+      if (sel != null) {
+        nameCtrl.text  = sel.name;
+        labelCtrl.text = sel.blend2Label;
+      }
+    }
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Save Blend Preset'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: nameCtrl,
+              decoration: const InputDecoration(
+                labelText: 'Preset Name',
+                hintText: 'e.g. 65% CVC, Viscose Blend',
+              ),
+              autofocus: true,
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: labelCtrl,
+              decoration: const InputDecoration(
+                labelText: 'Fibre 2 Label',
+                hintText: 'e.g. Viscose, Polyester, Modal',
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final name  = nameCtrl.text.trim();
+              final label = labelCtrl.text.trim();
+              if (name.isEmpty) return;
+
+              final price = double.tryParse(widget.b2PriceCtrl.text) ?? 0;
+              final waste = double.tryParse(widget.b2WasteCtrl.text) ?? 0;
+              final pct   = double.tryParse(widget.b2PctCtrl.text) ?? 0;
+
+              final preset = BlendPreset(
+                id: _selectedId ?? DateTime.now().millisecondsSinceEpoch.toString(),
+                name: name,
+                blend1Pct: 100 - pct,
+                blend2Pct: pct,
+                blend2PricePerKg: price,
+                blend2WastePct: waste,
+                blend2Label: label.isEmpty ? 'Fibre 2' : label,
+              );
+
+              ref.read(blendPresetsProvider.notifier).save(preset);
+              setState(() => _selectedId = preset.id);
+              Navigator.pop(ctx);
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _confirmDelete(BlendPreset preset) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete Blend'),
+        content: Text('Delete "${preset.name}"?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          TextButton(
+            style: TextButton.styleFrom(foregroundColor: AppTheme.danger),
+            onPressed: () {
+              ref.read(blendPresetsProvider.notifier).delete(preset.id);
+              if (_selectedId == preset.id) setState(() => _selectedId = null);
+              Navigator.pop(ctx);
+            },
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final presets = ref.watch(blendPresetsProvider);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // ── Header row ──────────────────────────────────────────────────────
+        Row(
+          children: [
+            const Text(
+              'SAVED BLENDS',
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                color: AppTheme.textSecondary,
+                letterSpacing: 0.5,
+              ),
+            ),
+            const Spacer(),
+            GestureDetector(
+              onTap: () => _showSaveDialog(presets),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AppTheme.primary,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.save_outlined, size: 13, color: Colors.white),
+                    const SizedBox(width: 4),
+                    Text(
+                      _selectedId != null ? 'Update' : 'Save as…',
+                      style: const TextStyle(
+                          fontSize: 12, color: Colors.white, fontWeight: FontWeight.w600),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+
+        // ── Preset chips ─────────────────────────────────────────────────────
+        if (presets.isEmpty)
+          const Text(
+            'No saved blends yet — fill in parameters below and tap Save as…',
+            style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+          )
+        else
+          Wrap(
+            spacing: 8,
+            runSpacing: 6,
+            children: presets.map((p) {
+              final isSelected = p.id == _selectedId;
+              return GestureDetector(
+                onLongPress: () => _confirmDelete(p),
+                child: GestureDetector(
+                  onTap: () => _load(p),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: isSelected ? AppTheme.primary : AppTheme.primaryLight,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: isSelected ? AppTheme.primary : AppTheme.divider,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (isSelected) ...[
+                          const Icon(Icons.check, size: 13, color: Colors.white),
+                          const SizedBox(width: 4),
+                        ],
+                        Text(
+                          p.name,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: isSelected ? Colors.white : AppTheme.primary,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          '${p.blend2Pct.toStringAsFixed(0)}% ${p.blend2Label}',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: isSelected
+                                ? Colors.white.withValues(alpha: 0.85)
+                                : AppTheme.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+
+        if (presets.isNotEmpty)
+          const Padding(
+            padding: EdgeInsets.only(top: 4),
+            child: Text(
+              'Tap to load · Long-press to delete',
+              style: TextStyle(fontSize: 10, color: AppTheme.textSecondary),
+            ),
+          ),
+
+        const Divider(height: 20),
+      ],
     );
   }
 }

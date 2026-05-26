@@ -81,6 +81,25 @@ class HomeScreen extends ConsumerWidget {
 
               SizedBox(
                 width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () => context.push('/quality'),
+                  icon: const Icon(Icons.science_outlined),
+                  label: const Text('Quality Diagnosis'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF057A55),
+                    foregroundColor: Colors.white,
+                    minimumSize: const Size.fromHeight(48),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 12),
+
+              SizedBox(
+                width: double.infinity,
                 child: OutlinedButton.icon(
                   onPressed: () => context.push('/profiles'),
                   icon: const Icon(Icons.tune_outlined),

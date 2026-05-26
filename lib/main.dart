@@ -15,6 +15,7 @@ void main() async {
   runApp(
     ProviderScope(
       overrides: [
+        sharedPreferencesProvider.overrideWithValue(prefs),
         storageServiceProvider.overrideWithValue(storage),
       ],
       child: const MillCostingApp(),

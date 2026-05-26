@@ -1,8 +1,13 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/mill_profile.dart';
 import '../services/storage_service.dart';
 
 // Injected at app start after SharedPreferences is ready
+final sharedPreferencesProvider = Provider<SharedPreferences>((ref) {
+  throw UnimplementedError('Override in ProviderScope');
+});
+
 final storageServiceProvider = Provider<StorageService>((ref) {
   throw UnimplementedError('Override in ProviderScope');
 });

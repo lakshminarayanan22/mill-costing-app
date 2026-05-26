@@ -1,5 +1,6 @@
 import 'dart:math';
 import 'qd_constants.dart';
+import 'lp_solver.dart';
 
 // ────────────────────────────────────────────────────────────────────────────
 // App 1 — Yarn IPI from HVI
@@ -540,99 +541,77 @@ double cottonYarnStrength(MixCotton c, double count, double tm) {
 
 class MixResult {
   final List<double> ratios; // % for each cotton
-  final double blendStrength; // RKM-like
+  final double blendStrength; // RKM
   final double blendCostPerCandy;
+  final bool targetMet; // false → target unachievable, showing best possible blend
 
   const MixResult({
     required this.ratios,
     required this.blendStrength,
     required this.blendCostPerCandy,
+    this.targetMet = true,
   });
 }
 
-/// Grid-search optimiser over n cottons (1% steps).
-/// Finds the minimum-cost blend meeting [targetStrength],
-/// or if [minimiseCost] is false, finds the blend closest to [targetStrength].
+/// Solves the blend optimisation LP by simplex (Big-M method):
+///
+///   Minimize   Σ price_i · x_i             (cotton cost)
+///   subject to Σ strength_i · x_i ≥ target · 100
+///              Σ x_i = 100
+///              x_i ≥ 0
+///
+/// Exact for any number of cottons. If no blend can meet [targetStrength],
+/// returns the maximum-strength blend with [MixResult.targetMet] = false.
 MixResult? optimiseMix({
   required List<MixCotton> cottons,
   required double count,
   required double tm,
   required double targetStrength,
-  bool minimiseCost = true,
 }) {
   if (cottons.isEmpty) return null;
-  final n = cottons.length;
   final strengths = cottons.map((c) => cottonYarnStrength(c, count, tm)).toList();
+  final prices = cottons.map((c) => c.priceRsPerCandy).toList();
 
-  if (n == 1) {
-    return MixResult(
-      ratios: [100],
-      blendStrength: strengths[0],
-      blendCostPerCandy: cottons[0].priceRsPerCandy,
-    );
-  }
-
-  // For 2 cottons: iterate over ratio of first (0–100 %)
-  // For 3+ cottons: use random search with large sample
-  List<double> bestRatios = List.filled(n, 100.0 / n);
-  double bestCost = double.infinity;
-  double bestStrDiff = double.infinity;
-  bool found = false;
-
-  void evaluate(List<double> ratios) {
-    final total = ratios.fold(0.0, (a, b) => a + b);
-    if ((total - 100.0).abs() > 0.5) return;
-    double blendStr = 0;
-    double blendCost = 0;
-    for (int k = 0; k < n; k++) {
-      blendStr += strengths[k] * ratios[k] / 100;
-      blendCost += cottons[k].priceRsPerCandy * ratios[k] / 100;
-    }
-    if (blendStr >= targetStrength) {
-      if (!found || blendCost < bestCost) {
-        bestCost = blendCost;
-        bestRatios = List.from(ratios);
-        found = true;
-      }
-    } else {
-      final diff = (blendStr - targetStrength).abs();
-      if (!found && diff < bestStrDiff) {
-        bestStrDiff = diff;
-        bestRatios = List.from(ratios);
-      }
-    }
-  }
-
-  if (n == 2) {
-    for (int r = 0; r <= 100; r++) {
-      evaluate([r.toDouble(), (100 - r).toDouble()]);
-    }
-  } else if (n == 3) {
-    for (int a = 0; a <= 100; a++) {
-      for (int b = 0; b <= 100 - a; b++) {
-        evaluate([a.toDouble(), b.toDouble(), (100 - a - b).toDouble()]);
-      }
-    }
-  } else {
-    // Random search for 4+ cottons
-    final rng = Random(42);
-    for (int iter = 0; iter < 50000; iter++) {
-      final r = List.generate(n, (_) => rng.nextDouble());
-      final sum = r.fold(0.0, (a, b) => a + b);
-      final normalised = r.map((v) => v / sum * 100).toList();
-      evaluate(normalised);
-    }
-  }
-
-  double blendStr = 0, blendCost = 0;
-  for (int k = 0; k < n; k++) {
-    blendStr += strengths[k] * bestRatios[k] / 100;
-    blendCost += cottons[k].priceRsPerCandy * bestRatios[k] / 100;
-  }
+  final (:ratios, :blendStrength, :blendCostPerCandy, :feasible) = solveBlendLP(
+    prices: prices,
+    strengths: strengths,
+    targetStrength: targetStrength,
+  );
 
   return MixResult(
-    ratios: bestRatios,
-    blendStrength: blendStr,
-    blendCostPerCandy: blendCost,
+    ratios: ratios,
+    blendStrength: blendStrength,
+    blendCostPerCandy: blendCostPerCandy,
+    targetMet: feasible,
   );
+}
+
+/// Expose the LP formulation as a human-readable string for display.
+String blendLpFormulation({
+  required List<MixCotton> cottons,
+  required double count,
+  required double tm,
+  required double targetStrength,
+}) {
+  final n = cottons.length;
+  final strengths = cottons.map((c) => cottonYarnStrength(c, count, tm)).toList();
+  final prices = cottons.map((c) => c.priceRsPerCandy).toList();
+
+  final varNames = List.generate(n, (i) => 'x${i + 1}');
+
+  // Objective line
+  final objTerms = List.generate(n, (i) => '${prices[i].toStringAsFixed(0)} ${varNames[i]}').join(' + ');
+  // Strength constraint
+  final strTerms = List.generate(n, (i) => '${strengths[i].toStringAsFixed(3)} ${varNames[i]}').join(' + ');
+  // Blend closure
+  final blendTerms = varNames.join(' + ');
+  // Cotton labels
+  final labels = List.generate(n, (i) => '  ${varNames[i]} = ${cottons[i].name}').join('\n');
+
+  return 'Minimize Z = $objTerms\n\n'
+      'subject to\n'
+      '  $strTerms ≥ ${(targetStrength * 100).toStringAsFixed(1)}  (strength ≥ $targetStrength RKM)\n'
+      '  $blendTerms = 100  (blend closes to 100 %)\n'
+      '  ${varNames.join(', ')} ≥ 0\n\n'
+      'Where:\n$labels';
 }

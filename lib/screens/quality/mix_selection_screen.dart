@@ -80,6 +80,8 @@ class _FromAvailableCottonState extends State<_FromAvailableCotton> {
   List<bool> _selected = List.filled(_defaultCottons.length, true);
   MixResult? _result;
   List<double> _perCottonStrengths = [];
+  String _lpFormulation = '';
+  List<MixCotton> _lastChosen = [];
 
   void _solve() {
     final count = double.tryParse(_count.text) ?? 60;
@@ -91,8 +93,17 @@ class _FromAvailableCottonState extends State<_FromAvailableCotton> {
     }
     if (chosen.isEmpty) return;
     setState(() {
-      _perCottonStrengths = _cottons.map((c) => cottonYarnStrength(c.toMixCotton(), count, tm)).toList();
+      _perCottonStrengths = _cottons
+          .map((c) => cottonYarnStrength(c.toMixCotton(), count, tm))
+          .toList();
+      _lastChosen = chosen;
       _result = optimiseMix(
+        cottons: chosen,
+        count: count,
+        tm: tm,
+        targetStrength: target,
+      );
+      _lpFormulation = blendLpFormulation(
         cottons: chosen,
         count: count,
         tm: tm,
@@ -108,6 +119,27 @@ class _FromAvailableCottonState extends State<_FromAvailableCotton> {
     });
   }
 
+  void _showLp(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('LP Formulation (Simplex)'),
+        content: SingleChildScrollView(
+          child: Text(
+            _lpFormulation,
+            style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
@@ -115,9 +147,27 @@ class _FromAvailableCottonState extends State<_FromAvailableCotton> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const QdInfoCard(
-            'Enter your available cottons, select which to include, '
-            'set target count and strength, then run the optimiser.',
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFEDE9FE),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(Icons.functions, size: 16, color: Color(0xFF6D28D9)),
+                const SizedBox(width: 8),
+                const Expanded(
+                  child: Text(
+                    'Solved by Big-M Simplex (Linear Programming). '
+                    'Finds the minimum-cost blend that exactly meets the strength target. '
+                    'Tap "Show LP" to see the full formulation.',
+                    style: TextStyle(fontSize: 12, color: Color(0xFF6D28D9)),
+                  ),
+                ),
+              ],
+            ),
           ),
           const SizedBox(height: 14),
           const QdSectionLabel('Target Yarn'),
@@ -131,8 +181,7 @@ class _FromAvailableCottonState extends State<_FromAvailableCotton> {
           const SizedBox(height: 14),
           Row(
             children: [
-              const QdSectionLabel('Cotton Table'),
-              const Spacer(),
+              const Expanded(child: QdSectionLabel('Cotton Table')),
               TextButton.icon(
                 onPressed: _addCotton,
                 icon: const Icon(Icons.add, size: 16),
@@ -141,43 +190,83 @@ class _FromAvailableCottonState extends State<_FromAvailableCotton> {
             ],
           ),
           ..._cottons.asMap().entries.map((e) => _CottonRow(
-            cotton: e.value,
-            selected: _selected[e.key],
-            onToggle: (v) => setState(() => _selected[e.key] = v),
-            onDelete: () => setState(() {
-              _cottons.removeAt(e.key);
-              _selected.removeAt(e.key);
-            }),
-            predictedStrength: _perCottonStrengths.isNotEmpty ? _perCottonStrengths[e.key] : null,
-          )),
+                cotton: e.value,
+                selected: _selected[e.key],
+                onToggle: (v) => setState(() => _selected[e.key] = v),
+                onDelete: () => setState(() {
+                  _cottons.removeAt(e.key);
+                  _selected.removeAt(e.key);
+                }),
+                predictedStrength: _perCottonStrengths.isNotEmpty
+                    ? _perCottonStrengths[e.key]
+                    : null,
+              )),
           const SizedBox(height: 14),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              onPressed: _solve,
-              child: const Text('Optimise Blend'),
+          Row(children: [
+            Expanded(
+              child: ElevatedButton(
+                onPressed: _solve,
+                child: const Text('Optimise Blend'),
+              ),
             ),
-          ),
+            if (_lpFormulation.isNotEmpty) ...[
+              const SizedBox(width: 10),
+              OutlinedButton(
+                onPressed: () => _showLp(context),
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size(80, 48),
+                  side: const BorderSide(color: Color(0xFF6D28D9)),
+                  foregroundColor: const Color(0xFF6D28D9),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+                child: const Text('Show LP'),
+              ),
+            ],
+          ]),
           if (_result != null) ...[
-            const SizedBox(height: 20),
-            const QdSectionLabel('Optimised Blend'),
+            const SizedBox(height: 16),
+            if (!_result!.targetMet)
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFDE8E8),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Row(
+                  children: [
+                    Icon(Icons.warning_amber_rounded, size: 16, color: Color(0xFFE02424)),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'LP is infeasible: no blend can meet the target strength. '
+                        'Showing the strongest achievable blend instead.',
+                        style: TextStyle(fontSize: 12, color: Color(0xFFE02424)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            const SizedBox(height: 10),
+            const QdSectionLabel('Optimal Blend (Simplex Solution)'),
             QdResultCard(children: [
-              QdResultRow('Expected Yarn Strength', '${_result!.blendStrength.toStringAsFixed(2)} RKM', highlight: true),
-              QdResultRow('Blend Cost', '₹${_result!.blendCostPerCandy.toStringAsFixed(0)}/candy', highlight: true),
+              QdResultRow(
+                'Blend Strength',
+                '${_result!.blendStrength.toStringAsFixed(3)} RKM',
+                highlight: true,
+              ),
+              QdResultRow(
+                'Minimum Cost',
+                '₹${_result!.blendCostPerCandy.toStringAsFixed(0)}/candy  '
+                    '(₹${(_result!.blendCostPerCandy / 356).toStringAsFixed(1)}/kg)',
+                highlight: true,
+              ),
               const Divider(height: 12),
-              ..._cottons.asMap().entries.where((e) => _selected[e.key]).map((e) {
-                final selectedIdx = _cottons.asMap().entries
-                    .where((ee) => _selected[ee.key])
-                    .toList()
-                    .indexWhere((ee) => ee.key == e.key);
-                if (selectedIdx >= 0 && selectedIdx < _result!.ratios.length) {
-                  return QdResultRow(
-                    e.value.name.isEmpty ? 'Cotton ${e.key + 1}' : e.value.name,
-                    '${_result!.ratios[selectedIdx].toStringAsFixed(1)}%',
-                  );
-                }
-                return const SizedBox.shrink();
-              }),
+              ..._lastChosen.asMap().entries.map(
+                    (e) => QdResultRow(
+                      e.value.name.isEmpty ? 'Cotton ${e.key + 1}' : e.value.name,
+                      '${_result!.ratios[e.key].toStringAsFixed(2)}%',
+                    ),
+                  ),
             ]),
           ],
         ],
@@ -385,14 +474,47 @@ class _RecommendationMixState extends State<_RecommendationMix> {
           ],
           if (_result != null) ...[
             const SizedBox(height: 12),
-            const QdSectionLabel('Recommended Blend'),
-            QdResultCard(children: [
-              QdResultRow('Expected Yarn Strength', '${_result!.blendStrength.toStringAsFixed(2)} RKM', highlight: true),
-              QdResultRow('Blend Cost', '₹${_result!.blendCostPerCandy.toStringAsFixed(0)}/candy', highlight: true),
-              const Divider(height: 12),
-              ..._usedCottons.asMap().entries.map((e) =>
-                QdResultRow(e.value.name, '${_result!.ratios[e.key].toStringAsFixed(1)}%')
+            if (!_result!.targetMet)
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFDE8E8),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Row(
+                  children: [
+                    Icon(Icons.warning_amber_rounded, size: 16, color: Color(0xFFE02424)),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'LP infeasible: no blend in this set meets the target strength.',
+                        style: TextStyle(fontSize: 12, color: Color(0xFFE02424)),
+                      ),
+                    ),
+                  ],
+                ),
               ),
+            const SizedBox(height: 8),
+            const QdSectionLabel('Optimal Blend (Simplex Solution)'),
+            QdResultCard(children: [
+              QdResultRow(
+                'Blend Strength',
+                '${_result!.blendStrength.toStringAsFixed(3)} RKM',
+                highlight: true,
+              ),
+              QdResultRow(
+                'Minimum Cost',
+                '₹${_result!.blendCostPerCandy.toStringAsFixed(0)}/candy  '
+                    '(₹${(_result!.blendCostPerCandy / 356).toStringAsFixed(1)}/kg)',
+                highlight: true,
+              ),
+              const Divider(height: 12),
+              ..._usedCottons.asMap().entries.map(
+                    (e) => QdResultRow(
+                      e.value.name,
+                      '${_result!.ratios[e.key].toStringAsFixed(2)}%',
+                    ),
+                  ),
             ]),
           ],
         ],

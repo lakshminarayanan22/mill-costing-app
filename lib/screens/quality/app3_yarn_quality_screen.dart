@@ -1,3 +1,4 @@
+import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import '../../quality/qd_engine.dart';
 import '../../theme/app_theme.dart';
@@ -260,7 +261,189 @@ class _App3YarnQualityScreenState extends State<App3YarnQualityScreen> {
                 QdResultRow('v76 (carded normal)', _result!.v76.toStringAsFixed(2)),
                 QdResultRow('v77 (carded compact)', _result!.v77.toStringAsFixed(2)),
               ]),
+              const SizedBox(height: 16),
+              _YarnQualityRadarCard(result: _result!),
             ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Yarn quality radar / bar chart ────────────────────────────────────────────
+// Shows predicted quality parameters as a radar chart (4 normalised axes).
+
+class _YarnQualityRadarCard extends StatelessWidget {
+  final App3Result result;
+  const _YarnQualityRadarCard({required this.result});
+
+  // Normalise a value into 0–1 score where 1 = good, 0 = poor.
+  // For "lower is better" params we invert.
+  static double _norm(double val, double best, double worst) {
+    if ((worst - best).abs() < 1e-9) return 0.5;
+    return ((val - worst) / (best - worst)).clamp(0.0, 1.0);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Good-mill reference ranges (combed 60s typical)
+    // Tenacity: 14–20 cN/tex (higher = better)
+    // Elongation: 4–7% (higher = better)
+    // U%: 7–12% (lower = better)
+    // Hairiness: 3–6 (lower = better)
+    final params = [
+      (
+        label: 'Tenacity',
+        unit: 'cN/tex',
+        value: result.tenacity,
+        score: _norm(result.tenacity, 20, 12),
+        color: AppTheme.componentColors[0],
+      ),
+      (
+        label: 'Elongation',
+        unit: '%',
+        value: result.elongation,
+        score: _norm(result.elongation, 7, 3),
+        color: AppTheme.componentColors[2],
+      ),
+      (
+        label: 'Evenness U%',
+        unit: '%',
+        value: result.uPct,
+        score: _norm(result.uPct, 7, 13),
+        color: AppTheme.componentColors[4],
+      ),
+      (
+        label: 'Hairiness',
+        unit: '',
+        value: result.hairinessUster,
+        score: _norm(result.hairinessUster, 3, 7),
+        color: AppTheme.componentColors[3],
+      ),
+    ];
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Quality Score (vs Good Mill)',
+                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+            const SizedBox(height: 2),
+            const Text(
+              'Bar = how close the predicted value is to a good-mill benchmark. Tap to see details.',
+              style: TextStyle(fontSize: 11, color: AppTheme.textSecondary),
+            ),
+            const SizedBox(height: 16),
+            ...params.map((p) => Padding(
+                  padding: const EdgeInsets.only(bottom: 14),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(p.label,
+                                style: const TextStyle(
+                                    fontSize: 13, fontWeight: FontWeight.w500)),
+                          ),
+                          Text(
+                            '${p.value.toStringAsFixed(2)}${p.unit.isNotEmpty ? ' ${p.unit}' : ''}',
+                            style: const TextStyle(
+                                fontSize: 13, fontWeight: FontWeight.w700),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 5),
+                      Stack(
+                        children: [
+                          Container(
+                            height: 10,
+                            decoration: BoxDecoration(
+                              color: AppTheme.surface,
+                              borderRadius: BorderRadius.circular(5),
+                            ),
+                          ),
+                          FractionallySizedBox(
+                            widthFactor: p.score,
+                            child: Container(
+                              height: 10,
+                              decoration: BoxDecoration(
+                                color: p.score >= 0.7
+                                    ? AppTheme.success
+                                    : p.score >= 0.4
+                                        ? AppTheme.warning
+                                        : AppTheme.danger,
+                                borderRadius: BorderRadius.circular(5),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        p.score >= 0.7
+                            ? 'Good'
+                            : p.score >= 0.4
+                                ? 'Average'
+                                : 'Below average',
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: p.score >= 0.7
+                              ? AppTheme.success
+                              : p.score >= 0.4
+                                  ? AppTheme.warning
+                                  : AppTheme.danger,
+                        ),
+                      ),
+                    ],
+                  ),
+                )),
+            const SizedBox(height: 4),
+            // Radar chart using fl_chart
+            SizedBox(
+              height: 220,
+              child: RadarChart(
+                RadarChartData(
+                  dataSets: [
+                    RadarDataSet(
+                      fillColor: AppTheme.primary.withValues(alpha: 0.15),
+                      borderColor: AppTheme.primary,
+                      borderWidth: 2,
+                      entryRadius: 4,
+                      dataEntries: params
+                          .map((p) => RadarEntry(value: p.score))
+                          .toList(),
+                    ),
+                  ],
+                  radarBackgroundColor: Colors.transparent,
+                  borderData: FlBorderData(show: false),
+                  radarBorderData:
+                      const BorderSide(color: AppTheme.divider, width: 1),
+                  gridBorderData:
+                      const BorderSide(color: AppTheme.divider, width: 0.5),
+                  tickCount: 4,
+                  ticksTextStyle: const TextStyle(
+                      fontSize: 0, color: Colors.transparent),
+                  tickBorderData:
+                      const BorderSide(color: AppTheme.divider, width: 0.5),
+                  getTitle: (index, angle) {
+                    final label = params[index].label;
+                    return RadarChartTitle(
+                      text: label,
+                      angle: angle,
+                    );
+                  },
+                  titleTextStyle: const TextStyle(
+                      fontSize: 11,
+                      color: AppTheme.textSecondary,
+                      fontWeight: FontWeight.w500),
+                  titlePositionPercentageOffset: 0.2,
+                ),
+              ),
+            ),
           ],
         ),
       ),

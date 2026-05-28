@@ -1,3 +1,4 @@
+import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import '../../quality/qd_engine.dart';
 import '../../theme/app_theme.dart';
@@ -268,6 +269,24 @@ class _FromAvailableCottonState extends State<_FromAvailableCotton> {
                     ),
                   ),
             ]),
+            const SizedBox(height: 16),
+            _BlendDonut(
+              names: _lastChosen.map((c) => c.name.isEmpty ? '?' : c.name).toList(),
+              ratios: _result!.ratios,
+            ),
+            const SizedBox(height: 16),
+            _StrengthBars(
+              names: _lastChosen.map((c) => c.name.isEmpty ? '?' : c.name).toList(),
+              strengths: List.generate(
+                _lastChosen.length,
+                (i) => cottonYarnStrength(
+                  _lastChosen[i],
+                  double.tryParse(_count.text) ?? 60,
+                  double.tryParse(_tm.text) ?? 4,
+                ),
+              ),
+              target: double.tryParse(_targetStrength.text) ?? 20,
+            ),
           ],
         ],
       ),
@@ -516,8 +535,257 @@ class _RecommendationMixState extends State<_RecommendationMix> {
                     ),
                   ),
             ]),
+            const SizedBox(height: 16),
+            _BlendDonut(
+              names: _usedCottons.map((c) => c.name).toList(),
+              ratios: _result!.ratios,
+            ),
+            const SizedBox(height: 16),
+            _StrengthBars(
+              names: _usedCottons.map((c) => c.name).toList(),
+              strengths: _perStrengths,
+              target: double.tryParse(_targetStrength.text) ?? 20,
+            ),
           ],
         ],
+      ),
+    );
+  }
+}
+
+// ── Blend donut chart ─────────────────────────────────────────────────────────
+
+class _BlendDonut extends StatefulWidget {
+  final List<String> names;
+  final List<double> ratios;
+
+  const _BlendDonut({required this.names, required this.ratios});
+
+  @override
+  State<_BlendDonut> createState() => _BlendDonutState();
+}
+
+class _BlendDonutState extends State<_BlendDonut> {
+  int _touched = -1;
+
+  static const _colors = [
+    Color(0xFF1A56DB),
+    Color(0xFF057A55),
+    Color(0xFFE3A008),
+    Color(0xFF9061F9),
+    Color(0xFFFF5A1F),
+    Color(0xFF0E9F6E),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final active = widget.ratios.asMap().entries.where((e) => e.value > 0.05).toList();
+    if (active.isEmpty) return const SizedBox.shrink();
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Blend Composition',
+                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+            const SizedBox(height: 12),
+            SizedBox(
+              height: 200,
+              child: PieChart(
+                PieChartData(
+                  sections: active.map((e) {
+                    final i = e.key;
+                    final ratio = e.value;
+                    final isTouched = i == _touched;
+                    final color = _colors[i % _colors.length];
+                    return PieChartSectionData(
+                      color: color,
+                      value: ratio,
+                      title: isTouched
+                          ? '${widget.names[i]}\n${ratio.toStringAsFixed(1)}%'
+                          : ratio >= 10
+                              ? '${ratio.toStringAsFixed(0)}%'
+                              : '',
+                      radius: isTouched ? 85 : 70,
+                      titleStyle: TextStyle(
+                        fontSize: isTouched ? 12 : 10,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
+                      ),
+                    );
+                  }).toList(),
+                  pieTouchData: PieTouchData(
+                    touchCallback: (event, response) {
+                      setState(() {
+                        if (!event.isInterestedForInteractions ||
+                            response?.touchedSection == null) {
+                          _touched = -1;
+                          return;
+                        }
+                        _touched = response!.touchedSection!.touchedSectionIndex;
+                      });
+                    },
+                  ),
+                  centerSpaceRadius: 40,
+                  sectionsSpace: 2,
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 12,
+              runSpacing: 6,
+              children: active.map((e) {
+                final color = _colors[e.key % _colors.length];
+                return Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 10,
+                      height: 10,
+                      decoration: BoxDecoration(
+                          color: color, borderRadius: BorderRadius.circular(2)),
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      '${widget.names[e.key]}  ${e.value.toStringAsFixed(1)}%',
+                      style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                    ),
+                  ],
+                );
+              }).toList(),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Per-cotton strength bar chart ─────────────────────────────────────────────
+
+class _StrengthBars extends StatelessWidget {
+  final List<String> names;
+  final List<double> strengths;
+  final double target;
+
+  const _StrengthBars({
+    required this.names,
+    required this.strengths,
+    required this.target,
+  });
+
+  static const _colors = [
+    Color(0xFF1A56DB),
+    Color(0xFF057A55),
+    Color(0xFFE3A008),
+    Color(0xFF9061F9),
+    Color(0xFFFF5A1F),
+    Color(0xFF0E9F6E),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    if (strengths.isEmpty) return const SizedBox.shrink();
+    final maxY = (strengths.fold(target, (a, b) => a > b ? a : b) * 1.2).ceilToDouble();
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Predicted Strength vs Target',
+                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+            const SizedBox(height: 2),
+            Text('RKM per cotton variety',
+                style: TextStyle(fontSize: 11, color: AppTheme.textSecondary)),
+            const SizedBox(height: 14),
+            SizedBox(
+              height: 180,
+              child: BarChart(
+                BarChartData(
+                  maxY: maxY,
+                  alignment: BarChartAlignment.spaceAround,
+                  barGroups: strengths.asMap().entries.map((e) {
+                    return BarChartGroupData(
+                      x: e.key,
+                      barRods: [
+                        BarChartRodData(
+                          toY: e.value,
+                          color: e.value >= target
+                              ? _colors[e.key % _colors.length]
+                              : AppTheme.textSecondary.withValues(alpha: 0.5),
+                          width: 24,
+                          borderRadius:
+                              const BorderRadius.vertical(top: Radius.circular(4)),
+                        ),
+                      ],
+                    );
+                  }).toList(),
+                  titlesData: FlTitlesData(
+                    leftTitles: AxisTitles(
+                      sideTitles: SideTitles(
+                        showTitles: true,
+                        reservedSize: 38,
+                        getTitlesWidget: (v, _) => Text(
+                          v.toStringAsFixed(0),
+                          style: const TextStyle(
+                              fontSize: 10, color: AppTheme.textSecondary),
+                        ),
+                      ),
+                    ),
+                    bottomTitles: AxisTitles(
+                      sideTitles: SideTitles(
+                        showTitles: true,
+                        getTitlesWidget: (v, _) {
+                          final i = v.toInt();
+                          if (i < 0 || i >= names.length) return const SizedBox();
+                          return Padding(
+                            padding: const EdgeInsets.only(top: 4),
+                            child: Text(
+                              names[i],
+                              style: const TextStyle(
+                                  fontSize: 9, color: AppTheme.textSecondary),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                    rightTitles: const AxisTitles(
+                        sideTitles: SideTitles(showTitles: false)),
+                    topTitles: const AxisTitles(
+                        sideTitles: SideTitles(showTitles: false)),
+                  ),
+                  borderData: FlBorderData(show: false),
+                  gridData: const FlGridData(drawVerticalLine: false),
+                  extraLinesData: ExtraLinesData(
+                    horizontalLines: [
+                      HorizontalLine(
+                        y: target,
+                        color: AppTheme.danger,
+                        strokeWidth: 1.5,
+                        dashArray: [6, 4],
+                        label: HorizontalLineLabel(
+                          show: true,
+                          alignment: Alignment.topRight,
+                          labelResolver: (_) =>
+                              'Target ${target.toStringAsFixed(0)} RKM',
+                          style: const TextStyle(
+                              fontSize: 10,
+                              color: AppTheme.danger,
+                              fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

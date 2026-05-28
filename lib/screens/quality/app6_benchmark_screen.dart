@@ -1,3 +1,4 @@
+import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import '../../quality/data/yarn_quality.dart';
 import '../../quality/qd_constants.dart';
@@ -108,6 +109,8 @@ class _App6BenchmarkScreenState extends State<App6BenchmarkScreen> {
               ),
               const SizedBox(height: 12),
               _benchmarkTable(best, good, avg),
+              const SizedBox(height: 16),
+              _BenchmarkBarChart(best: best, good: good, avg: avg),
             ],
           ],
         ),
@@ -186,4 +189,203 @@ class _DerivedRow {
     required this.neps140, required this.neps200,
     required this.hairiness, required this.density,
   });
+}
+
+// ── Grouped bar chart: Best / Good / Average for 5 key parameters ─────────────
+
+class _BenchmarkBarChart extends StatefulWidget {
+  final YarnQualityRow best;
+  final _DerivedRow good;
+  final _DerivedRow avg;
+
+  const _BenchmarkBarChart({
+    required this.best,
+    required this.good,
+    required this.avg,
+  });
+
+  @override
+  State<_BenchmarkBarChart> createState() => _BenchmarkBarChartState();
+}
+
+class _BenchmarkBarChartState extends State<_BenchmarkBarChart> {
+  int _touchedGroup = -1;
+  int _touchedRod = -1;
+
+  // 5 key parameters shown: U%, CVm%, Thin-50%, Thick+50%, Neps+200%
+  static const _paramLabels = ['U%', 'CVm%', 'Thin-50', 'Thick+50', 'Neps+200'];
+  static const _bestColor = Color(0xFF057A55);
+  static const _goodColor = Color(0xFF1A56DB);
+  static const _avgColor  = Color(0xFFE3A008);
+
+  List<double> _bestVals(YarnQualityRow b) =>
+      [b.uPct, b.cvmPct, b.thin50, b.thick50, b.neps200];
+
+  List<double> _goodVals(_DerivedRow g) =>
+      [g.uPct, g.cvmPct, g.thin50, g.thick50, g.neps200];
+
+  List<double> _avgVals(_DerivedRow a) =>
+      [a.uPct, a.cvmPct, a.thin50, a.thick50, a.neps200];
+
+  @override
+  Widget build(BuildContext context) {
+    final bv = _bestVals(widget.best);
+    final gv = _goodVals(widget.good);
+    final av = _avgVals(widget.avg);
+
+    // Max across all for Y axis
+    double maxY = 0;
+    for (int i = 0; i < 5; i++) {
+      if (av[i] > maxY) maxY = av[i];
+    }
+    maxY = (maxY * 1.2).ceilToDouble();
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 16, 12, 8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('COPS Comparison Chart',
+                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                _legend('Best', _bestColor),
+                const SizedBox(width: 12),
+                _legend('Good', _goodColor),
+                const SizedBox(width: 12),
+                _legend('Average', _avgColor),
+              ],
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              height: 220,
+              child: BarChart(
+                BarChartData(
+                  maxY: maxY,
+                  alignment: BarChartAlignment.spaceAround,
+                  groupsSpace: 10,
+                  barTouchData: BarTouchData(
+                    touchCallback: (event, response) {
+                      setState(() {
+                        if (!event.isInterestedForInteractions ||
+                            response?.spot == null) {
+                          _touchedGroup = -1;
+                          _touchedRod = -1;
+                          return;
+                        }
+                        _touchedGroup = response!.spot!.touchedBarGroupIndex;
+                        _touchedRod = response.spot!.touchedRodDataIndex;
+                      });
+                    },
+                    touchTooltipData: BarTouchTooltipData(
+                      getTooltipColor: (_) => AppTheme.textPrimary,
+                      getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                        final tier = ['Best', 'Good', 'Avg'][rodIndex];
+                        return BarTooltipItem(
+                          '$tier\n${rod.toY.toStringAsFixed(1)}',
+                          const TextStyle(
+                              color: Colors.white,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600),
+                        );
+                      },
+                    ),
+                  ),
+                  barGroups: List.generate(5, (i) {
+                    return BarChartGroupData(
+                      x: i,
+                      barRods: [
+                        BarChartRodData(
+                          toY: bv[i],
+                          color: (_touchedGroup == i && _touchedRod == 0)
+                              ? _bestColor
+                              : _bestColor.withValues(alpha: 0.85),
+                          width: 10,
+                          borderRadius:
+                              const BorderRadius.vertical(top: Radius.circular(3)),
+                        ),
+                        BarChartRodData(
+                          toY: gv[i],
+                          color: (_touchedGroup == i && _touchedRod == 1)
+                              ? _goodColor
+                              : _goodColor.withValues(alpha: 0.85),
+                          width: 10,
+                          borderRadius:
+                              const BorderRadius.vertical(top: Radius.circular(3)),
+                        ),
+                        BarChartRodData(
+                          toY: av[i],
+                          color: (_touchedGroup == i && _touchedRod == 2)
+                              ? _avgColor
+                              : _avgColor.withValues(alpha: 0.85),
+                          width: 10,
+                          borderRadius:
+                              const BorderRadius.vertical(top: Radius.circular(3)),
+                        ),
+                      ],
+                    );
+                  }),
+                  titlesData: FlTitlesData(
+                    bottomTitles: AxisTitles(
+                      sideTitles: SideTitles(
+                        showTitles: true,
+                        getTitlesWidget: (v, _) {
+                          final i = v.toInt();
+                          if (i < 0 || i >= _paramLabels.length) return const SizedBox();
+                          return Padding(
+                            padding: const EdgeInsets.only(top: 4),
+                            child: Text(
+                              _paramLabels[i],
+                              style: const TextStyle(
+                                  fontSize: 9, color: AppTheme.textSecondary),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                    leftTitles: AxisTitles(
+                      sideTitles: SideTitles(
+                        showTitles: true,
+                        reservedSize: 36,
+                        getTitlesWidget: (v, _) => Text(
+                          v.toStringAsFixed(0),
+                          style: const TextStyle(
+                              fontSize: 9, color: AppTheme.textSecondary),
+                        ),
+                      ),
+                    ),
+                    rightTitles: const AxisTitles(
+                        sideTitles: SideTitles(showTitles: false)),
+                    topTitles: const AxisTitles(
+                        sideTitles: SideTitles(showTitles: false)),
+                  ),
+                  borderData: FlBorderData(show: false),
+                  gridData: const FlGridData(drawVerticalLine: false),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _legend(String label, Color color) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 10,
+          height: 10,
+          decoration:
+              BoxDecoration(color: color, borderRadius: BorderRadius.circular(2)),
+        ),
+        const SizedBox(width: 4),
+        Text(label,
+            style: const TextStyle(fontSize: 11, color: AppTheme.textSecondary)),
+      ],
+    );
+  }
 }

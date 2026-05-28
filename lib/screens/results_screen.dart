@@ -1,3 +1,4 @@
+import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
@@ -188,6 +189,8 @@ class ResultsScreen extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 12),
+                    _CostPieChart(result: result),
+                    const SizedBox(height: 16),
                     ...result.costComponents
                         .asMap()
                         .entries
@@ -503,6 +506,63 @@ class _InfoRow extends StatelessWidget {
               style: const TextStyle(
                   fontSize: 13, fontWeight: FontWeight.w600)),
         ],
+      ),
+    );
+  }
+}
+
+class _CostPieChart extends StatefulWidget {
+  final CalculationResult result;
+  const _CostPieChart({required this.result});
+
+  @override
+  State<_CostPieChart> createState() => _CostPieChartState();
+}
+
+class _CostPieChartState extends State<_CostPieChart> {
+  int _touched = -1;
+
+  @override
+  Widget build(BuildContext context) {
+    final components = widget.result.costComponents;
+    return SizedBox(
+      height: 200,
+      child: PieChart(
+        PieChartData(
+          sections: components.asMap().entries.map((e) {
+            final i = e.key;
+            final comp = e.value;
+            final isTouched = i == _touched;
+            final pct = comp.value / widget.result.totalCostPerKg * 100;
+            return PieChartSectionData(
+              color: AppTheme.componentColors[i % AppTheme.componentColors.length],
+              value: comp.value,
+              title: isTouched
+                  ? '${comp.name}\n${pct.toStringAsFixed(1)}%'
+                  : pct >= 8 ? '${pct.toStringAsFixed(0)}%' : '',
+              radius: isTouched ? 80 : 64,
+              titleStyle: TextStyle(
+                fontSize: isTouched ? 11 : 10,
+                fontWeight: FontWeight.w700,
+                color: Colors.white,
+              ),
+            );
+          }).toList(),
+          pieTouchData: PieTouchData(
+            touchCallback: (event, response) {
+              setState(() {
+                if (!event.isInterestedForInteractions ||
+                    response?.touchedSection == null) {
+                  _touched = -1;
+                  return;
+                }
+                _touched = response!.touchedSection!.touchedSectionIndex;
+              });
+            },
+          ),
+          centerSpaceRadius: 38,
+          sectionsSpace: 2,
+        ),
       ),
     );
   }

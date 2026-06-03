@@ -236,14 +236,40 @@ class ResultsScreen extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'SPIN PLAN',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        color: AppTheme.textSecondary,
-                        letterSpacing: 0.5,
-                      ),
+                    Row(
+                      children: [
+                        const Expanded(
+                          child: Text(
+                            'SPIN PLAN',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: AppTheme.textSecondary,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: result.isCombed
+                                ? AppTheme.primaryLight
+                                : AppTheme.successLight,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            result.isCombed ? 'COMBED' : 'CARDED',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              color: result.isCombed
+                                  ? AppTheme.primary
+                                  : AppTheme.success,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 12),
                     _InfoRow('TPI',
@@ -323,24 +349,26 @@ class ResultsScreen extends StatelessWidget {
                       result.finDrawingDeliveriesInstalled.toDouble(),
                       result.finDrawingCapacityRatio,
                     ),
-                    _CapacityRow(
-                      'Combers',
-                      result.combersRequired,
-                      result.combersInstalled.toDouble(),
-                      result.comberCapacityRatio,
-                    ),
-                    _CapacityRow(
-                      'Lap Formers',
-                      result.lapFormersRequired,
-                      result.lapFormersInstalled.toDouble(),
-                      result.lapFormerCapacityRatio,
-                    ),
-                    _CapacityRow(
-                      'Pre-Comber Deliveries',
-                      result.preComberDeliveriesRequired,
-                      result.preComberDeliveriesInstalled.toDouble(),
-                      result.preComberCapacityRatio,
-                    ),
+                    if (result.isCombed) ...[
+                      _CapacityRow(
+                        'Combers',
+                        result.combersRequired,
+                        result.combersInstalled.toDouble(),
+                        result.comberCapacityRatio,
+                      ),
+                      _CapacityRow(
+                        'Lap Formers',
+                        result.lapFormersRequired,
+                        result.lapFormersInstalled.toDouble(),
+                        result.lapFormerCapacityRatio,
+                      ),
+                      _CapacityRow(
+                        'Pre-Comber Deliveries',
+                        result.preComberDeliveriesRequired,
+                        result.preComberDeliveriesInstalled.toDouble(),
+                        result.preComberCapacityRatio,
+                      ),
+                    ],
                     _CapacityRow(
                       'Cards',
                       result.cardsRequired,

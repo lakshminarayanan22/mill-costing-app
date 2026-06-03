@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../models/blend_preset.dart';
 import '../models/calculation_input.dart';
+// ProcessType and YarnType are defined in calculation_input.dart
 import '../providers/blend_preset_provider.dart';
 import '../providers/calculation_provider.dart';
 import '../providers/mill_profile_provider.dart';
@@ -51,6 +52,7 @@ class _CalculatorScreenState extends ConsumerState<CalculatorScreen> {
   late TextEditingController _b2Pct;
 
   late YarnType _yarnType;
+  late ProcessType _processType;
   late String _priceMode;
   late bool _isBlend;
 
@@ -114,6 +116,7 @@ class _CalculatorScreenState extends ConsumerState<CalculatorScreen> {
     _b2Pct = TextEditingController(text: inp.blend2Pct.toStringAsFixed(1));
 
     _yarnType = inp.yarnType;
+    _processType = inp.processType;
     _priceMode = inp.priceMode;
     _isBlend = inp.isBlend;
   }
@@ -154,6 +157,7 @@ class _CalculatorScreenState extends ConsumerState<CalculatorScreen> {
       resultantCount: count,
       yarnType: _yarnType,
       plies: plies,
+      processType: _processType,
       bracket: editedBracket,
       spindleSpeedRpm: double.tryParse(_spindleSpeed.text) ?? 16500,
       twistMultiplier: double.tryParse(_tm.text) ?? 4.2,
@@ -227,15 +231,68 @@ class _CalculatorScreenState extends ConsumerState<CalculatorScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ── Yarn Type ──────────────────────────────────────────────────
+            // ── Yarn Type & Process Route ──────────────────────────────────
             Card(
               child: Padding(
                 padding: const EdgeInsets.all(16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const SectionHeader(title: 'YARN TYPE'),
+                    const SectionHeader(title: 'YARN TYPE & PROCESS'),
                     const SizedBox(height: 12),
+
+                    // Carded / Combed toggle
+                    const Text(
+                      'SPINNING PROCESS',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: AppTheme.textSecondary,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: ProcessType.values.map((pt) {
+                        final active = _processType == pt;
+                        return Expanded(
+                          child: GestureDetector(
+                            onTap: () => setState(() => _processType = pt),
+                            child: Container(
+                              margin: EdgeInsets.only(
+                                  right: pt == ProcessType.combed ? 6 : 0),
+                              padding: const EdgeInsets.symmetric(vertical: 10),
+                              decoration: BoxDecoration(
+                                color: active
+                                    ? AppTheme.primary
+                                    : AppTheme.surface,
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: active
+                                      ? AppTheme.primary
+                                      : AppTheme.divider,
+                                ),
+                              ),
+                              alignment: Alignment.center,
+                              child: Text(
+                                pt.label,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: active
+                                      ? Colors.white
+                                      : AppTheme.textSecondary,
+                                ),
+                              ),
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+
+                    const SizedBox(height: 14),
+
+                    // Yarn type (single / TFO)
                     DropdownButtonFormField<YarnType>(
                       initialValue: _yarnType,
                       decoration: const InputDecoration(labelText: 'Yarn Type'),
@@ -267,6 +324,54 @@ class _CalculatorScreenState extends ConsumerState<CalculatorScreen> {
                       controller: _count,
                       onChanged: _onCountChanged,
                     ),
+
+                    // TFO info sub-card
+                    if (_yarnType == YarnType.tfoDoubled) ...[
+                      const SizedBox(height: 12),
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: AppTheme.primaryLight,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                              color: AppTheme.primary.withValues(alpha: 0.3)),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Row(
+                              children: [
+                                Icon(Icons.info_outline,
+                                    size: 14, color: AppTheme.primary),
+                                SizedBox(width: 6),
+                                Text(
+                                  'TFO DOUBLING DETAILS',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w700,
+                                    color: AppTheme.primary,
+                                    letterSpacing: 0.5,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            _TfoInfoRow(
+                              'Ring frame spins',
+                              '${_count.text}s singles',
+                            ),
+                            _TfoInfoRow(
+                              'TFO combines',
+                              '2 × ${_count.text}s → plied yarn',
+                            ),
+                            _TfoInfoRow(
+                              'TFO conversion cost',
+                              'Driven by mill TFO profile',
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -453,24 +558,10 @@ class _CalculatorScreenState extends ConsumerState<CalculatorScreen> {
                       ],
                     ),
                     const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: LabelField(
-                            label: 'Comber Noil',
-                            unit: '%',
-                            controller: _comberNoil,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: LabelField(
-                            label: 'Winding Eff.',
-                            unit: '%',
-                            controller: _windingEff,
-                          ),
-                        ),
-                      ],
+                    LabelField(
+                      label: 'Winding Eff.',
+                      unit: '%',
+                      controller: _windingEff,
                     ),
                   ],
                 ),
@@ -513,26 +604,35 @@ class _CalculatorScreenState extends ConsumerState<CalculatorScreen> {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: LabelField(
-                            label: 'Comber Noil',
-                            unit: '%',
-                            controller: _comberNoil,
+                    if (_processType == ProcessType.combed) ...[
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: LabelField(
+                              label: 'Comber Noil',
+                              unit: '%',
+                              controller: _comberNoil,
+                            ),
                           ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: LabelField(
-                            label: 'Yarn Waste Cost',
-                            unit: '%',
-                            controller: _yarnWasteCost,
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: LabelField(
+                              label: 'Yarn Waste Cost',
+                              unit: '%',
+                              controller: _yarnWasteCost,
+                            ),
                           ),
-                        ),
-                      ],
-                    ),
+                        ],
+                      ),
+                    ] else ...[
+                      const SizedBox(height: 8),
+                      LabelField(
+                        label: 'Yarn Waste Cost',
+                        unit: '%',
+                        controller: _yarnWasteCost,
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -893,6 +993,32 @@ class _BlendPresetBarState extends ConsumerState<_BlendPresetBar> {
 
         const Divider(height: 20),
       ],
+    );
+  }
+}
+
+class _TfoInfoRow extends StatelessWidget {
+  final String label;
+  final String value;
+  const _TfoInfoRow(this.label, this.value);
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(label,
+                style: const TextStyle(fontSize: 12, color: AppTheme.primary)),
+          ),
+          Text(value,
+              style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: AppTheme.primary)),
+        ],
+      ),
     );
   }
 }

@@ -56,6 +56,9 @@ class CalculationResult {
   final double yarnWasteCost;
   final double tfoConversionCost; // 0 for single yarn
 
+  // ── Process route ────────────────────────────────────────────────────────────
+  final bool isCombed; // false = carded (hides comber capacity rows)
+
   // ── Profitability ────────────────────────────────────────────────────────────
   final double totalCostPerKg;
   final double singleYarnCostPerKg; // before TFO add-on
@@ -107,6 +110,7 @@ class CalculationResult {
     required this.overheadCost,
     required this.yarnWasteCost,
     required this.tfoConversionCost,
+    this.isCombed = true,
     required this.totalCostPerKg,
     required this.singleYarnCostPerKg,
     required this.sellingPricePerKg,
@@ -136,16 +140,19 @@ class CalculationResult {
   double get windingCapacityRatio =>
       1 - (windingDrumsRequired / windingDrumsInstalled);
 
-  bool get hasCapacityShortfall => [
-        simplexCapacityRatio,
-        finDrawingCapacityRatio,
-        comberCapacityRatio,
-        lapFormerCapacityRatio,
-        preComberCapacityRatio,
-        cardCapacityRatio,
-        blowRoomCapacityRatio,
-        windingCapacityRatio,
-      ].any((r) => r < 0);
+  bool get hasCapacityShortfall {
+    final base = [
+      simplexCapacityRatio,
+      finDrawingCapacityRatio,
+      cardCapacityRatio,
+      blowRoomCapacityRatio,
+      windingCapacityRatio,
+    ];
+    if (isCombed) {
+      base.addAll([comberCapacityRatio, lapFormerCapacityRatio, preComberCapacityRatio]);
+    }
+    return base.any((r) => r < 0);
+  }
 
   // For the donut chart
   List<({String name, double value})> get costComponents => [

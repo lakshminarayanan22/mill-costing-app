@@ -46,7 +46,7 @@ class _InstallBannerState extends State<InstallBanner> {
                   ),
                   SizedBox(height: 2),
                   Text(
-                    'Tap here to install for offline use',
+                    'Offline use · Open in Safari first if link came from a message',
                     style: TextStyle(
                         fontSize: 12, color: AppTheme.textSecondary),
                   ),
@@ -111,10 +111,10 @@ class _InstallBannerState extends State<InstallBanner> {
               icon: Icons.phone_iphone,
               title: 'On iPhone (Safari)',
               steps: const [
-                'Open this page in Safari (not Chrome)',
-                'Tap the Share button  at the bottom',
-                'Scroll down and tap "Add to Home Screen"',
-                'Tap "Add" — done!',
+                'If you opened this link from iMessage, WhatsApp, or Gmail — tap ⋯ or the share icon inside that app → "Open in Safari". The Install option only appears in the real Safari browser.',
+                'In Safari, scroll to the bottom toolbar and tap the Share icon ⎙ (box with arrow pointing up)',
+                'Scroll down the share sheet and tap "Add to Home Screen"',
+                'Tap "Add" — the app icon appears on your home screen!',
               ],
             ),
 

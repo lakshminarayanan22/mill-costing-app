@@ -64,6 +64,7 @@ class CostingEngine {
       overheadCost: costs.overhead,
       yarnWasteCost: costs.yarnWaste,
       tfoConversionCost: costs.tfoConversion,
+      isCombed: inp.processType == ProcessType.combed,
       totalCostPerKg: costs.total,
       singleYarnCostPerKg: costs.singleYarnCost,
       sellingPricePerKg: profit.effectiveSellingPrice,
@@ -115,38 +116,46 @@ class CostingEngine {
     final finDrawRequiredKgDay = simplexRequiredKgDay / 0.99;
     final finDrawDeliveriesReq = finDrawRequiredKgDay / finDrawKgDelDayAdj;
 
-    // ── Comber ────────────────────────────────────────────────────────────────
-    // Excel denom: 1000×100×100×1000×lapTensionDraft (two ×100s: one for noil%, one for eff%)
-    // Efficiency as fraction → remove one ×100: 1000×100×1000×lapTensionDraft
-    const feedPerNip      = (25.4 * 22) / (7 * 16); // 4.989 mm fixed mechanical constant
-    const lapTensionDraft = 1.152;
-    final comberKgFrame8Hr = (b.comberNpm * 60 * 8 * feedPerNip *
-            b.comberLapWeightGpyd * 1.0934 * 8 *
-            (100 - inp.comberNoilPct) * b.comberEfficiency) /
-        (1000 * 100 * 1000 * lapTensionDraft);
-    final comberKgFrameDay   = comberKgFrame8Hr * 3 * b.comberUtilisation;
-    final comberRequiredKgDay = finDrawRequiredKgDay / 0.99;
-    final combersReq          = comberRequiredKgDay / comberKgFrameDay;
+    // ── Comber / Lap Former / Pre-Comber (combed route only) ─────────────────
+    final bool isCombed = inp.processType == ProcessType.combed;
 
-    // ── Lap former ────────────────────────────────────────────────────────────
-    // Excel: /100000 was for efficiency-as-%; with fraction: /1000
-    final lapKgFrame8Hr    = (b.lapFormerMpm * 60 * 8 * b.lapFormerEfficiency *
-            b.lapFormerLapWeightGpyd * 1.0934) / 1000;
-    final lapKgFrameDay    = lapKgFrame8Hr * 3 * 0.96;
-    final lapRequiredKgDay = ((comberRequiredKgDay / 0.99) * 100) /
-        (100 - inp.comberNoilPct);
-    final lapFormersReq    = lapRequiredKgDay / lapKgFrameDay;
+    double combersReq = 0;
+    double lapFormersReq = 0;
+    double preComberDeliveriesReq = 0;
+    double comberRequiredKgDay = 0;
+    double lapRequiredKgDay = 0;
+    double preComberRequiredKgDay = 0;
 
-    // ── Pre-comber drawing ────────────────────────────────────────────────────
-    final preComberKgDel8Hr = (b.preComberMpm * 60 * 8 * 1.0936 * b.preComberEfficiency) /
-        (b.preComberHank * 2.2046 * 840);
-    final preComberKgDelDayAdj   = preComberKgDel8Hr * 3 * b.preComberDrawingUtilisation;
-    final preComberRequiredKgDay = lapRequiredKgDay / 0.99;
-    final preComberDeliveriesReq = preComberRequiredKgDay / preComberKgDelDayAdj;
+    if (isCombed) {
+      const feedPerNip      = (25.4 * 22) / (7 * 16);
+      const lapTensionDraft = 1.152;
+      final comberKgFrame8Hr = (b.comberNpm * 60 * 8 * feedPerNip *
+              b.comberLapWeightGpyd * 1.0934 * 8 *
+              (100 - inp.comberNoilPct) * b.comberEfficiency) /
+          (1000 * 100 * 1000 * lapTensionDraft);
+      final comberKgFrameDay = comberKgFrame8Hr * 3 * b.comberUtilisation;
+      comberRequiredKgDay    = finDrawRequiredKgDay / 0.99;
+      combersReq             = comberRequiredKgDay / comberKgFrameDay;
+
+      final lapKgFrame8Hr = (b.lapFormerMpm * 60 * 8 * b.lapFormerEfficiency *
+              b.lapFormerLapWeightGpyd * 1.0934) / 1000;
+      final lapKgFrameDay = lapKgFrame8Hr * 3 * 0.96;
+      lapRequiredKgDay    = ((comberRequiredKgDay / 0.99) * 100) /
+          (100 - inp.comberNoilPct);
+      lapFormersReq = lapRequiredKgDay / lapKgFrameDay;
+
+      final preComberKgDel8Hr = (b.preComberMpm * 60 * 8 * 1.0936 * b.preComberEfficiency) /
+          (b.preComberHank * 2.2046 * 840);
+      final preComberKgDelDayAdj = preComberKgDel8Hr * 3 * b.preComberDrawingUtilisation;
+      preComberRequiredKgDay     = lapRequiredKgDay / 0.99;
+      preComberDeliveriesReq     = preComberRequiredKgDay / preComberKgDelDayAdj;
+    }
 
     // ── Carding ───────────────────────────────────────────────────────────────
+    // Combed: cards feed pre-comber drawing chain.
+    // Carded: cards feed finisher drawing directly (no comber chain).
     final cardKgCardDayAdj  = b.cardingKgPerHr * 8 * b.cardingEfficiency * 3 * 0.95;
-    final cardRequiredKgDay = preComberRequiredKgDay;
+    final cardRequiredKgDay = isCombed ? preComberRequiredKgDay : finDrawRequiredKgDay;
     final cardsReq          = cardRequiredKgDay / cardKgCardDayAdj;
 
     // ── Blow room ──────────────────────────────────────────────────────────────
@@ -176,8 +185,10 @@ class CostingEngine {
       preComberDeliveriesRequired: preComberDeliveriesReq,
       cardsRequired: cardsReq, blowRoomLinesRequired: blowRoomLinesReq,
       windingDrumsRequired: windDrumsReq,
-      cardRequiredKgDay: cardRequiredKgDay, comberRequiredKgDay: comberRequiredKgDay,
-      lapRequiredKgDay: lapRequiredKgDay, preComberRequiredKgDay: preComberRequiredKgDay,
+      cardRequiredKgDay: cardRequiredKgDay,
+      comberRequiredKgDay: comberRequiredKgDay,
+      lapRequiredKgDay: lapRequiredKgDay,
+      preComberRequiredKgDay: preComberRequiredKgDay,
       simplexRequiredKgDay: simplexRequiredKgDay, finDrawRequiredKgDay: finDrawRequiredKgDay,
     );
   }
@@ -209,14 +220,16 @@ class CostingEngine {
     final rfUkg = rfKwPerFrame * mill.ringFrameCount * 24 / yarnKgDay;
 
     // Other machines — kW × load factor, grossed-up for downstream waste
+    // Comber / lap former / pre-comber are zero for carded process.
+    final bool powIsCombed = inp.processType == ProcessType.combed;
     final simplex   = _processUkg(kw: mill.simplexMachines * mill.simplexSpindlesPerMachine * 0.016, hoursPerDay: 24, kgDay: yarnKgDay, wasteFactor: 1.02);
-    final comber    = _processUkg(kw: mill.combers * 11.0,                    hoursPerDay: 24, kgDay: yarnKgDay, wasteFactor: 1.0302);
-    final card      = _processUkg(kw: mill.cards * 18.5,                      hoursPerDay: 24, kgDay: yarnKgDay, wasteFactor: 1.19);
-    final finDraw   = _processUkg(kw: mill.finDrawingMachines * 5.5,          hoursPerDay: 24, kgDay: yarnKgDay, wasteFactor: 1.0302);
-    final preComber = _processUkg(kw: mill.preComberDrawingMachines * 5.5,    hoursPerDay: 24, kgDay: yarnKgDay, wasteFactor: 1.19);
-    final lapFormer = _processUkg(kw: mill.lapFormers * 7.5,                  hoursPerDay: 24, kgDay: yarnKgDay, wasteFactor: 1.0302);
-    final winding   = _processUkg(kw: mill.windingMachines * 12.0,            hoursPerDay: 24, kgDay: yarnKgDay, wasteFactor: 1.01);
-    final blowRoom  = _processUkg(kw: mill.blowRoomLines * 45.0,              hoursPerDay: 22.5, kgDay: yarnKgDay, wasteFactor: 1.28);
+    final comber    = powIsCombed ? _processUkg(kw: mill.combers * 11.0,               hoursPerDay: 24, kgDay: yarnKgDay, wasteFactor: 1.0302) : 0.0;
+    final card      = _processUkg(kw: mill.cards * 18.5,                               hoursPerDay: 24, kgDay: yarnKgDay, wasteFactor: 1.19);
+    final finDraw   = _processUkg(kw: mill.finDrawingMachines * 5.5,                   hoursPerDay: 24, kgDay: yarnKgDay, wasteFactor: 1.0302);
+    final preComber = powIsCombed ? _processUkg(kw: mill.preComberDrawingMachines * 5.5, hoursPerDay: 24, kgDay: yarnKgDay, wasteFactor: 1.19) : 0.0;
+    final lapFormer = powIsCombed ? _processUkg(kw: mill.lapFormers * 7.5,             hoursPerDay: 24, kgDay: yarnKgDay, wasteFactor: 1.0302) : 0.0;
+    final winding   = _processUkg(kw: mill.windingMachines * 12.0,                     hoursPerDay: 24, kgDay: yarnKgDay, wasteFactor: 1.01);
+    final blowRoom  = _processUkg(kw: mill.blowRoomLines * 45.0,                       hoursPerDay: 22.5, kgDay: yarnKgDay, wasteFactor: 1.28);
 
     final spinningUkg = rfUkg + simplex + comber + card + finDraw +
         preComber + lapFormer + winding + blowRoom;

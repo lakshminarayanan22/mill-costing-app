@@ -1,5 +1,15 @@
 import 'count_bracket.dart';
 
+/// Spinning process route — independent of yarn type.
+/// Carded: Blow Room → Cards → Drawing → Simplex → Ring
+/// Combed: Blow Room → Cards → Pre-Comber Drawing → Lap Former → Comber → Finisher Drawing → Simplex → Ring
+enum ProcessType {
+  combed,
+  carded;
+
+  String get label => this == combed ? 'Combed' : 'Carded';
+}
+
 enum YarnType {
   single('Single'),
   tfoDoubled('TFO Doubled'),
@@ -21,6 +31,7 @@ class CalculationInput {
   final double resultantCount; // Ne of final yarn delivered to customer (e.g. 94)
   final YarnType yarnType;
   final int plies; // 1 for single, 2 for doubled
+  final ProcessType processType; // combed or carded spinning route
 
   // ── Machine params (auto-filled from bracket, editable) ─────────────────────
   final CountBracket bracket;
@@ -62,6 +73,7 @@ class CalculationInput {
     required this.resultantCount,
     required this.yarnType,
     required this.plies,
+    this.processType = ProcessType.combed,
     required this.bracket,
     required this.spindleSpeedRpm,
     required this.twistMultiplier,
@@ -128,6 +140,7 @@ class CalculationInput {
     double? resultantCount,
     YarnType? yarnType,
     int? plies,
+    ProcessType? processType,
     CountBracket? bracket,
     double? spindleSpeedRpm,
     double? twistMultiplier,
@@ -154,6 +167,7 @@ class CalculationInput {
       resultantCount: resultantCount ?? this.resultantCount,
       yarnType: yarnType ?? this.yarnType,
       plies: plies ?? this.plies,
+      processType: processType ?? this.processType,
       bracket: bracket ?? this.bracket,
       spindleSpeedRpm: spindleSpeedRpm ?? this.spindleSpeedRpm,
       twistMultiplier: twistMultiplier ?? this.twistMultiplier,

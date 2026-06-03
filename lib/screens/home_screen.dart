@@ -200,20 +200,56 @@ class _ActiveMillCard extends StatelessWidget {
                 color: AppTheme.textPrimary,
               ),
             ),
-            const SizedBox(height: 4),
-            Text(
-              '${mill.totalSpindles} spindles · ${mill.ringFrameCount} frames · '
-              '${mill.cards} cards',
-              style: const TextStyle(
-                fontSize: 13,
-                color: AppTheme.textSecondary,
-              ),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 8,
+              runSpacing: 6,
+              children: [
+                millStatChip(
+                    icon: Icons.grain,
+                    label: '${mill.totalSpindles} spindles'),
+                millStatChip(
+                    icon: Icons.view_module_outlined,
+                    label: '${mill.ringFrameCount} frames'),
+                millStatChip(
+                    icon: Icons.filter_list,
+                    label: '${mill.cards} cards'),
+                if (mill.tfoSpindles > 0)
+                  millStatChip(
+                      icon: Icons.double_arrow,
+                      label: '${mill.tfoSpindles} TFO'),
+              ],
             ),
           ],
         ),
       ),
     );
   }
+
+Widget millStatChip({required IconData icon, required String label}) {
+  return Container(
+    padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+    decoration: BoxDecoration(
+      color: AppTheme.primaryLight,
+      borderRadius: BorderRadius.circular(20),
+    ),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 12, color: AppTheme.primary),
+        const SizedBox(width: 4),
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+            color: AppTheme.primary,
+          ),
+        ),
+      ],
+    ),
+  );
+}
 
   void _showMillPicker(BuildContext context) {
     showModalBottomSheet(

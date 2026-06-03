@@ -24,13 +24,14 @@ class ResultsScreen extends StatelessWidget {
           icon: const Icon(Icons.arrow_back),
           onPressed: () => context.pop(),
         ),
-        actions: [
-          TextButton.icon(
-            onPressed: () => context.push('/analytics', extra: result),
-            icon: const Icon(Icons.bar_chart, size: 18),
-            label: const Text('Analytics'),
-          ),
-        ],
+        actions: const [],
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => context.push('/analytics', extra: result),
+        backgroundColor: AppTheme.primary,
+        foregroundColor: Colors.white,
+        icon: const Icon(Icons.bar_chart_rounded),
+        label: const Text('Analytics', style: TextStyle(fontWeight: FontWeight.w600)),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -42,12 +43,22 @@ class ResultsScreen extends StatelessWidget {
               width: double.infinity,
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: isProfit ? AppTheme.successLight : AppTheme.dangerLight,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: isProfit ? AppTheme.success : AppTheme.danger,
-                  width: 1.5,
+                gradient: LinearGradient(
+                  colors: isProfit
+                      ? [const Color(0xFF057A55), const Color(0xFF0E9F6E)]
+                      : [const Color(0xFFE02424), const Color(0xFFFF5A1F)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
                 ),
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: (isProfit ? AppTheme.success : AppTheme.danger)
+                        .withValues(alpha: 0.3),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -56,15 +67,15 @@ class ResultsScreen extends StatelessWidget {
                     children: [
                       Icon(
                         isProfit ? Icons.trending_up : Icons.trending_down,
-                        color: isProfit ? AppTheme.success : AppTheme.danger,
+                        color: Colors.white,
                         size: 20,
                       ),
                       const SizedBox(width: 6),
                       Text(
                         isProfit ? 'Profitable' : 'Loss-Making',
-                        style: TextStyle(
+                        style: const TextStyle(
                           fontWeight: FontWeight.w700,
-                          color: isProfit ? AppTheme.success : AppTheme.danger,
+                          color: Colors.white70,
                           fontSize: 14,
                         ),
                       ),
@@ -76,22 +87,20 @@ class ResultsScreen extends StatelessWidget {
                     children: [
                       Text(
                         '₹${_fmt.format(result.profitPerKg.abs())}',
-                        style: TextStyle(
-                          fontSize: 32,
+                        style: const TextStyle(
+                          fontSize: 36,
                           fontWeight: FontWeight.w800,
-                          color: isProfit ? AppTheme.success : AppTheme.danger,
+                          color: Colors.white,
                         ),
                       ),
-                      const SizedBox(width: 4),
+                      const SizedBox(width: 6),
                       Padding(
-                        padding: const EdgeInsets.only(bottom: 4),
+                        padding: const EdgeInsets.only(bottom: 6),
                         child: Text(
-                          isProfit ? 'profit/kg' : 'loss/kg',
-                          style: TextStyle(
+                          isProfit ? 'profit / kg' : 'loss / kg',
+                          style: const TextStyle(
                             fontSize: 14,
-                            color: isProfit
-                                ? AppTheme.success
-                                : AppTheme.danger,
+                            color: Colors.white70,
                           ),
                         ),
                       ),
@@ -413,15 +422,16 @@ class _ProfitChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.5),
+        color: Colors.white.withValues(alpha: 0.2),
         borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
       ),
       child: Text(
         '$label: ${value.toStringAsFixed(1)}%',
-        style: TextStyle(
+        style: const TextStyle(
           fontSize: 11,
           fontWeight: FontWeight.w600,
-          color: isProfit ? AppTheme.success : AppTheme.danger,
+          color: Colors.white,
         ),
       ),
     );

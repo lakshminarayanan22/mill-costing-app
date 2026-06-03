@@ -245,12 +245,19 @@ class _App2FqiScreenState extends ConsumerState<App2FqiScreen> {
             ),
             if (_result != null) ...[
               const SizedBox(height: 20),
-              const QdSectionLabel('Result'),
+              // ── Primary score meter ──────────────────────────────────────
+              if (_selectedIndexValue != null)
+                _ScoreMeter(
+                  label: _selectedIndexName,
+                  value: _selectedIndexValue!,
+                  cottonName: _cottonName.text,
+                ),
+              const SizedBox(height: 14),
+              // ── All three values ─────────────────────────────────────────
+              const QdSectionLabel('All Indices'),
               QdResultCard(children: [
-                if (_indexSel == 1 || true) ...[
-                  QdResultRow('FQI', _result!.fqi.toStringAsFixed(3),
-                      highlight: _indexSel == 1),
-                ],
+                QdResultRow('FQI', _result!.fqi.toStringAsFixed(3),
+                    highlight: _indexSel == 1),
                 const Divider(height: 8),
                 QdResultRow('SCI (mode 1 HVI-HVI colour)', _result!.sci.toStringAsFixed(3),
                     highlight: _indexSel == 2 && _sciMode == 1),
@@ -275,6 +282,190 @@ class _App2FqiScreenState extends ConsumerState<App2FqiScreen> {
                 ),
               ),
             ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Score meter card ──────────────────────────────────────────────────────────
+// Shows the selected quality index as a large colour-coded score with grade label.
+
+class _ScoreMeter extends StatelessWidget {
+  final String label;
+  final double value;
+  final String cottonName;
+
+  const _ScoreMeter({
+    required this.label,
+    required this.value,
+    required this.cottonName,
+  });
+
+  // SCI typical range: 100–170, FQI: 80–180, PQI: 100–200
+  // Zones (normalised to 0–1 using a 60–200 scale):
+  static const double _scaleMin = 60;
+  static const double _scaleMax = 200;
+
+  String get _grade {
+    if (value >= 160) return 'Excellent';
+    if (value >= 130) return 'Good';
+    if (value >= 100) return 'Average';
+    return 'Below Average';
+  }
+
+  Color get _gradeColor {
+    if (value >= 160) return AppTheme.success;
+    if (value >= 130) return const Color(0xFF1A56DB);
+    if (value >= 100) return AppTheme.warning;
+    return AppTheme.danger;
+  }
+
+  double get _fraction =>
+      ((value - _scaleMin) / (_scaleMax - _scaleMin)).clamp(0.0, 1.0);
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        label,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: AppTheme.textSecondary,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        cottonName,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: AppTheme.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 12, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: _gradeColor.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                        color: _gradeColor.withValues(alpha: 0.35)),
+                  ),
+                  child: Text(
+                    _grade,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: _gradeColor,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            // Large score value
+            Text(
+              value.toStringAsFixed(1),
+              style: TextStyle(
+                fontSize: 52,
+                fontWeight: FontWeight.w800,
+                color: _gradeColor,
+                height: 1,
+              ),
+            ),
+            const SizedBox(height: 16),
+            // Progress bar with zone markers
+            Column(
+              children: [
+                // Zone colour bar
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(6),
+                  child: SizedBox(
+                    height: 10,
+                    child: Row(
+                      children: [
+                        Expanded(
+                            flex: 40,
+                            child: Container(color: AppTheme.danger)),
+                        Expanded(
+                            flex: 30,
+                            child: Container(color: AppTheme.warning)),
+                        Expanded(
+                            flex: 30,
+                            child: Container(
+                                color: const Color(0xFF1A56DB))),
+                        Expanded(
+                            flex: 40,
+                            child: Container(color: AppTheme.success)),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                // Needle
+                LayoutBuilder(
+                  builder: (ctx, constraints) {
+                    final pos = (_fraction * constraints.maxWidth)
+                        .clamp(4.0, constraints.maxWidth - 4);
+                    return Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        const SizedBox(height: 12, width: double.infinity),
+                        Positioned(
+                          left: pos - 4,
+                          top: -6,
+                          child: Container(
+                            width: 8,
+                            height: 18,
+                            decoration: BoxDecoration(
+                              color: _gradeColor,
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                          ),
+                        ),
+                      ],
+                    );
+                  },
+                ),
+                const SizedBox(height: 2),
+                // Scale labels
+                const Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('60',
+                        style: TextStyle(
+                            fontSize: 10, color: AppTheme.textSecondary)),
+                    Text('100',
+                        style: TextStyle(
+                            fontSize: 10, color: AppTheme.textSecondary)),
+                    Text('130',
+                        style: TextStyle(
+                            fontSize: 10, color: AppTheme.textSecondary)),
+                    Text('160',
+                        style: TextStyle(
+                            fontSize: 10, color: AppTheme.textSecondary)),
+                    Text('200',
+                        style: TextStyle(
+                            fontSize: 10, color: AppTheme.textSecondary)),
+                  ],
+                ),
+              ],
+            ),
           ],
         ),
       ),

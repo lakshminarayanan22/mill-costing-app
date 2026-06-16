@@ -29,7 +29,7 @@ class MillCostingApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp.router(
-      title: 'Mill Costing',
+      title: 'Ecolink Mill Costing',
       theme: AppTheme.theme,
       routerConfig: appRouter,
       debugShowCheckedModeBanner: false,

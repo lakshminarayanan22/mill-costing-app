@@ -29,7 +29,7 @@ class HomeScreen extends ConsumerWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Mill Costing',
+                          'Ecolink Mill Costing',
                           style: TextStyle(
                             fontSize: 26,
                             fontWeight: FontWeight.w800,
